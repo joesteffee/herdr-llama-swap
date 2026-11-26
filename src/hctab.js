@@ -77,6 +77,8 @@ async function ensureTerminal(env, root) {
     if (t.state === "live") {
       const g = await runHerdrCore(["get", t.address], { env });
       if (g.ok && isDashboard(unwrap(g.stdout))) return { ok: true, id: t.address };
+      // live but not the dashboard: rm only removes finished terminals, so end it first (failures ignored)
+      await runHerdrCore(["kill", t.address], { env });
     }
     stale.push(t.address);
   }
@@ -87,7 +89,13 @@ async function ensureTerminal(env, root) {
     { env },
   );
   if (!r.ok) return { ok: false, reason: `herdr-core run failed: ${oneLine(r.stderr || r.stdout)}` };
-  const id = unwrap(r.stdout)?.address;
+  let id = unwrap(r.stdout)?.address;
+  if (!id) {
+    const ls2 = await runHerdrCore(["ls", "--json"], { env });
+    const p2 = ls2.ok ? unwrap(ls2.stdout) : null;
+    const l2 = Array.isArray(p2?.terminals) ? p2.terminals : Array.isArray(p2) ? p2 : [];
+    id = l2.find((t) => t && t.name === NAME && t.state === "live" && t.address)?.address;
+  }
   if (!id) return { ok: false, reason: "herdr-core run: no address in output" };
   return { ok: true, id };
 }

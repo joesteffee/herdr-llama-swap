@@ -47,10 +47,10 @@ function fake(doc = mkDoc()) {
     'echo "$@" >> "$D/log"\n' +
     'if [ -n "$FAIL" ]; then echo boom >&2; exit 1; fi\n' +
     'case "$1" in\n' +
-    '  ls) echo "$LS";;\n' +
+    '  ls) if [ -n "$RUN_NO_ADDR" ] && [ -f "$D/ran" ]; then echo "$LS_AFTER"; else echo "$LS"; fi;;\n' +
     '  get) echo "$GET";;\n' +
     '  rm) ;;\n' +
-    '  run) echo \'{"address":"t9z","name":"llama-swap","state":"live"}\';;\n' +
+    '  run) touch "$D/ran"; if [ -n "$RUN_NO_ADDR" ]; then echo \'{"name":"llama-swap","state":"live"}\'; else echo \'{"address":"t9z","name":"llama-swap","state":"live"}\'; fi;;\n' +
     "  connect)\n" +
     "    read line\n" +
     '    echo "$line" >> "$D/rpc"\n' +
@@ -134,9 +134,23 @@ test("hc dead terminal with the right name: rm before run", () => {
 test("hc live terminal whose foreground is not the dashboard: rm then run", () => {
   const r = fake().open(["--target", "hc"], { LS: lsOf([LIVE]), GET: SHELL_GET });
   assert.equal(r.status, 0, r.stderr);
+  const kill = r.calls.findIndex((c) => c === "kill t2v");
   const rm = r.calls.findIndex((c) => c === "rm t2v");
   const run = r.calls.findIndex((c) => c.startsWith("run "));
-  assert.ok(rm >= 0 && run > rm);
+  assert.ok(kill >= 0, r.calls.join(" | "));
+  assert.ok(kill < rm && rm < run, r.calls.join(" | "));
+});
+
+test("hc run reply without address: falls back to ls for the live llama-swap terminal", () => {
+  const r = fake().open(["--target", "hc"], {
+    LS: lsOf([OTHER]),
+    RUN_NO_ADDR: "1",
+    LS_AFTER: lsOf([OTHER, { address: "t7q", name: "llama-swap", state: "live" }]),
+  });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), "t7q");
+  assert.equal(r.sets.length, 1);
+  assert.deepEqual(r.sets[0].params.value.spaces[0].tabs[0].root.children[0].content, { terminal: "t7q" });
 });
 
 test("hc doc.set conflict: re-reads, retries once, exits 0", () => {
