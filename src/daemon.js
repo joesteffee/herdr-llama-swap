@@ -112,9 +112,11 @@ async function runLoop({ url } = {}) {
       console.error(`[llama-swap] poll crashed: ${err?.stack || err}`);
     }
     if (stopping) break;
+    // NOTE: this timer must stay referenced — with every handle unref'd the
+    // event loop empties after the first poll and the daemon silently exits.
     await new Promise((resolve) => {
       wake = resolve;
-      setTimeout(resolve, backoffMs(cfg.pollMs, failures)).unref?.();
+      setTimeout(resolve, backoffMs(cfg.pollMs, failures));
     });
     wake = null;
   }

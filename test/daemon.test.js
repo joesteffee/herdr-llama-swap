@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { startMock } from "./helpers/mock-server.js";
 import { computeEvents, pollOnce, backoffMs } from "../src/daemon.js";
@@ -121,4 +121,23 @@ test("dashboard render snapshot has key fields and actions text", async () => {
   assert.match(text, /6\.6\/8\.0 GiB/);
   const off = stripAnsi(render({ status: "offline", lastError: "x" }, { color: false }).join("\n"));
   assert.match(off, /unreachable/);
+});
+
+test("daemon run keeps polling (regression: unref sleep ended the loop)", async () => {
+  const dir = fs.mkdtempSync(path.join(tmp, "loop-"));
+  const env = { LLAMASWAP_URL: mock.url, LLAMASWAP_POLL_MS: "250", HERDR_PLUGIN_STATE_DIR: dir, HERDR_BIN_PATH: "/nonexistent", HERDR_WORKSPACE_ID: "w1" };
+  const child = spawn(process.execPath, ["src/daemon.js", "run"], { cwd: ROOT, env: { ...process.env, ...env }, stdio: "ignore" });
+  const read = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, "state.json"), "utf8")); } catch { return null; } };
+  try {
+    let first = null;
+    for (let i = 0; i < 60 && !first; i++) { await new Promise((r) => setTimeout(r, 100)); first = read(); }
+    assert.ok(first, "daemon wrote state.json");
+    await new Promise((r) => setTimeout(r, 1000));
+    assert.equal(child.exitCode, null, "daemon must still be alive after its first poll");
+    const second = read();
+    assert.ok(second && second.updatedAt > first.updatedAt, "daemon must keep polling and rewriting state.json");
+  } finally {
+    child.kill("SIGTERM");
+    await new Promise((r) => child.once("exit", r));
+  }
 });

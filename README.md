@@ -21,7 +21,7 @@ herdr plugin link .
 
 ### Keybinding
 
-The manifest ships a `[[keys.command]]` entry for `alt+s`. If your Herdr ignores keybindings from plugin manifests, add this to `~/.config/herdr/config.toml`:
+Keybindings live in the user config, not the plugin manifest. Add this to ~/.config/herdr/config.toml:
 
 ```toml
 [[keys.command]]
@@ -31,7 +31,11 @@ command = "llama-swap.open-dashboard"
 description = "Open llama-swap dashboard (alt+s)"
 ```
 
-then run `herdr server reload-config`. You can also run the action `llama-swap Dashboard` from the command palette, or `bin/herdr-llama-swap` directly.
+then run `herdr server reload-config` (verify with `herdr config check`). You can also invoke the action `llama-swap Dashboard` from the command palette or run `bin/herdr-llama-swap`.
+
+### Popup placement
+
+`placement = "popup"` in `herdr-plugin.toml` is the only place it takes effect: the v0.9.5 CLI rejects `--placement popup` (possible values are overlay, split, tab, zoomed), so `bin/herdr-llama-swap` opens the pane with no --placement flag and lets the manifest decide. Only one popup can be open at a time (`ui_busy` error).
 
 ## Configuration
 

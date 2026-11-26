@@ -178,8 +178,8 @@ async function runTui({ url, pollMs }) {
     if (str === "R") { if (requireOnline()) act("Resume", () => client.resume()); return; }
   });
 
-  setInterval(() => { spin++; draw(); }, 120).unref();
-  setInterval(refresh, pollMs).unref();
+  setInterval(() => { spin++; draw(); }, 120);
+  setInterval(refresh, pollMs);
   await refresh();
   await new Promise(() => {});
 }

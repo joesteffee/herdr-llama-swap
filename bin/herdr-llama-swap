@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
+# Open the llama-swap dashboard popup pane.
+# Placement/size come from the [[panes]] entry in herdr-plugin.toml;
+# the v0.9.5 CLI does not accept --placement popup, so do not pass one here.
 set -eu
 herdr="${HERDR_BIN_PATH:-herdr}"
 cd "${HERDR_PLUGIN_ROOT:-$(dirname "$0")/..}"
-exec "$herdr" plugin pane open --plugin llama-swap --entrypoint dashboard --placement popup --focus
+exec "$herdr" plugin pane open --plugin llama-swap --entrypoint dashboard --focus

@@ -21,12 +21,6 @@ title = "llama-swap: print status"
 contexts = ["global"]
 command = ["node", "src/cli.js", "status"]
 
-[[keys.command]]
-key = "alt+s"
-type = "plugin_action"
-command = "llama-swap.open-dashboard"
-description = "Open llama-swap dashboard (alt+s)"
-
 [[panes]]
 id = "dashboard"
 title = "llama-swap"
