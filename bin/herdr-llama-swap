@@ -3,7 +3,7 @@
 # [[panes]] entry in herdr-plugin.toml; the v0.9.5 CLI rejects --placement popup).
 # With args they go to `herdr-llama-swap open` (e.g. --target workspace|split|popup).
 set -eu
-root="${HERDR_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+root="${HERDR_PLUGIN_ROOT:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
 cd "$root"
 export HERDR_PLUGIN_ROOT="$root"
 if [ "$#" -eq 0 ]; then set -- --target popup; fi
