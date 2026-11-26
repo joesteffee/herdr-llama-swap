@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Open the llama-swap dashboard popup pane.
-# Placement/size come from the [[panes]] entry in herdr-plugin.toml;
-# the v0.9.5 CLI does not accept --placement popup, so do not pass one here.
+# Open the llama-swap dashboard. No args = session-modal popup (placement/size come from the
+# [[panes]] entry in herdr-plugin.toml; the v0.9.5 CLI rejects --placement popup).
+# With args they go to `herdr-llama-swap open` (e.g. --target workspace|split|popup).
 set -eu
-herdr="${HERDR_BIN_PATH:-herdr}"
-cd "${HERDR_PLUGIN_ROOT:-$(dirname "$0")/..}"
-exec "$herdr" plugin pane open --plugin llama-swap --entrypoint dashboard --focus
+root="${HERDR_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+cd "$root"
+export HERDR_PLUGIN_ROOT="$root"
+if [ "$#" -eq 0 ]; then set -- --target popup; fi
+exec node "$root/src/cli.js" open "$@"

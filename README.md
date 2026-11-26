@@ -61,6 +61,7 @@ Endpoint resolution order: `--url`, `$LLAMASWAP_URL`, `$HERDR_PLUGIN_CONFIG_DIR/
 herdr-llama-swap status [--json]      one poll, human-readable or JSON (`once` is an alias)
 herdr-llama-swap models               list models and load state
 herdr-llama-swap dashboard [--once]   live TUI; snapshot with --once or when not a TTY
+herdr-llama-swap open [--target workspace|split|popup]   open the live dashboard in Herdr (default: workspace)
 herdr-llama-swap daemon start|stop|status|run|once
 herdr-llama-swap unload <id> [--yes]  refuses ids that are not currently loaded
 herdr-llama-swap pause|resume [--yes]
@@ -130,3 +131,15 @@ Tests use a local mock server and need no network.
 ## License
 
 MIT, © Joe Steffee
+
+## Opening the dashboard as a normal pane
+
+`herdr-llama-swap open [--target workspace|split|popup]` (also `bin/herdr-llama-swap --target ...`; bare `bin/herdr-llama-swap` still opens the popup):
+
+- `workspace` (default): reuses the workspace labelled `llama-swap` (focuses it) or creates one with cwd = plugin root, then runs the dashboard in its root pane. This is a **normal, persistent, tiled pane** that can sit beside your agents.
+- `split`: splits the current pane to the right and runs the dashboard there.
+- `popup`: the session-modal popup (`plugin pane open --entrypoint dashboard`); it closes with `q`.
+
+It prints the workspace/pane id (or JSON with `--json`); on failure one line goes to stderr and the exit code is 1.
+
+Plugin action id: `llama-swap.open-terminal` ("llama-swap: open live status pane", runs `--target workspace`). Keybindings must be added in your own herdr `config.toml` (`[[keys.command]]` with `type = "plugin_action"`), because manifest keybinds are ignored in herdr 0.9.5.

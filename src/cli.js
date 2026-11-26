@@ -6,6 +6,7 @@ import { resolveConfig } from "./lib/config.js";
 import { makeClient, collect } from "./lib/poll.js";
 import { dashboard, fmtDuration } from "./dashboard.js";
 import { main as daemonMain } from "./daemon.js";
+import { openDashboard } from "./open.js";
 
 const pkg = JSON.parse(fs.readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
 
@@ -18,6 +19,7 @@ Commands:
   once                       alias of status
   models                     list models and load state
   dashboard [--once]         live TUI (snapshot with --once or when not a TTY)
+  open [--target T]          open live dashboard in a normal pane: workspace (default), split, popup
   daemon start|stop|status|run|once
   unload <id> [--yes]        unload a currently loaded model
   pause [--yes]              pause llama-swap
@@ -28,7 +30,7 @@ Exit codes: 0 ok, 1 failure, 2 usage error
 `;
 
 export function parseArgs(argv) {
-  const o = { _: [], json: false, yes: false, once: false, help: false, version: false, url: undefined };
+  const o = { _: [], json: false, yes: false, once: false, help: false, version: false, url: undefined, target: undefined };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json") o.json = true;
@@ -38,6 +40,8 @@ export function parseArgs(argv) {
     else if (a === "--version" || a === "-v") o.version = true;
     else if (a === "--url") { o.url = argv[++i]; if (!o.url) o.bad = "--url needs a value"; }
     else if (a.startsWith("--url=")) o.url = a.slice(6);
+    else if (a === "--target") { o.target = argv[++i]; if (!o.target) o.bad = "--target needs a value"; }
+    else if (a.startsWith("--target=")) o.target = a.slice(9);
     else o._.push(a);
   }
   return o;
@@ -108,6 +112,14 @@ export async function run(argv) {
       }
       case "dashboard":
         return await dashboard({ url: o.url, once: o.once });
+      case "open": {
+        const target = o.target ?? "workspace";
+        if (!["workspace", "split", "popup"].includes(target)) { console.error("--target must be workspace|split|popup"); return 2; }
+        const r = await openDashboard({ target });
+        if (!r.ok) { console.error(r.reason); return 1; }
+        console.log(o.json ? JSON.stringify(r) : r.id);
+        return 0;
+      }
       case "daemon":
         return await daemonMain([...rest, ...(o.url ? ["--url", o.url] : [])]);
       case "unload": {

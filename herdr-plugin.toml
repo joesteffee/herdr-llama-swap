@@ -16,6 +16,13 @@ contexts = ["global"]
 command = ["./bin/herdr-llama-swap"]
 
 [[actions]]
+id = "open-terminal"
+title = "llama-swap: open live status pane"
+description = "Open the live dashboard in a normal persistent Herdr workspace"
+contexts = ["global"]
+command = ["./bin/herdr-llama-swap", "--target", "workspace"]
+
+[[actions]]
 id = "status"
 title = "llama-swap: print status"
 contexts = ["global"]
