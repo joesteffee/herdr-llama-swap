@@ -61,7 +61,7 @@ Endpoint resolution order: `--url`, `$LLAMASWAP_URL`, `$HERDR_PLUGIN_CONFIG_DIR/
 herdr-llama-swap status [--json]      one poll, human-readable or JSON (`once` is an alias)
 herdr-llama-swap models               list models and load state
 herdr-llama-swap dashboard [--once]   live TUI; snapshot with --once or when not a TTY
-herdr-llama-swap open [--target workspace|split|popup]   open the live dashboard in Herdr (default: workspace)
+herdr-llama-swap open [--target workspace|split|popup|hc|hc-tab]   open the live dashboard (default: workspace; hc = herdr-core app tab)
 herdr-llama-swap daemon start|stop|status|run|once
 herdr-llama-swap unload <id> [--yes]  refuses ids that are not currently loaded
 herdr-llama-swap pause|resume [--yes]
@@ -134,11 +134,12 @@ MIT, © Joe Steffee
 
 ## Opening the dashboard as a normal pane
 
-`herdr-llama-swap open [--target workspace|split|popup]` (also `bin/herdr-llama-swap --target ...`; bare `bin/herdr-llama-swap` still opens the popup):
+`herdr-llama-swap open [--target workspace|split|popup|hc|hc-tab]` (also `bin/herdr-llama-swap --target ...`; bare `bin/herdr-llama-swap` still opens the popup):
 
 - `workspace` (default): reuses the workspace labelled `llama-swap` (focuses it) or creates one with cwd = plugin root. The root pane comes from `workspace list` (`root_pane.pane_id`), falling back to the first pane of that workspace in `pane list` (matched by `workspace_id`), since `workspace get` does not expose it. The dashboard is (re)started only when it is not already the pane's foreground process, decided with `herdr pane process-info --pane <id>` (a `src/cli.js dashboard` cmdline). So pressing `q` and running `open` again brings it back, while running `open` twice in a row creates nothing new. This is a **normal, persistent, tiled pane** that can sit beside your agents.
 - `split`: resolves the target pane from `$HERDR_PANE_ID`, else `$HERDR_PLUGIN_CONTEXT_JSON`, else the `focused: true` entry of `pane list` (then a `$HERDR_WORKSPACE_ID` match), and calls `herdr pane split --pane <id> --direction right`, then runs the dashboard in the new pane. `--current` is never used: it requires `HERDR_PANE_ID`, which a plain shell does not have.
 - `popup`: the session-modal popup (`plugin pane open --entrypoint dashboard`); it closes with `q`.
+- `hc` (alias `hc-tab`): for the **herdr-core** UI (the desktop app's spaces/tabs), a different binary from `herdr`. Creates or reuses a live herdr-core terminal named `llama-swap` running the dashboard (`herdr-core run --bg --no-parent --no-notify --name llama-swap --cwd <plugin root> node src/cli.js dashboard`; a dead or non-dashboard same-named terminal is `rm`-ed first because live names must be unique), then ensures an app tab named `llama-swap` at the front of space 0 in herdr-core's `herdr-app` document (`doc.get`/`doc.set` over `herdr-core connect`) points at it. An existing tab only has its first block's `content.terminal` rewritten; otherwise a new tab is inserted at index 0. Idempotent; a `doc.set` version conflict is re-read and retried once. Requires `herdr-core` on PATH (override with `HERDR_CORE_BIN`). Prints the terminal address; `--json` gives `{"ok":true,"kind":"hc-tab","id":"<addr>","tab":"<tab id>"}`.
 
 It prints the workspace/pane id (or JSON with `--json`); on failure one line goes to stderr and the exit code is 1.
 

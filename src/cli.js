@@ -7,6 +7,7 @@ import { makeClient, collect } from "./lib/poll.js";
 import { dashboard, fmtDuration } from "./dashboard.js";
 import { main as daemonMain } from "./daemon.js";
 import { openDashboard } from "./open.js";
+import { openHcTab } from "./hctab.js";
 
 const pkg = JSON.parse(fs.readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
 
@@ -19,7 +20,7 @@ Commands:
   once                       alias of status
   models                     list models and load state
   dashboard [--once]         live TUI (snapshot with --once or when not a TTY)
-  open [--target T]          open live dashboard in a normal pane: workspace (default), split, popup
+  open [--target T]          open live dashboard: workspace (default), split, popup in herdr; hc|hc-tab = herdr-core app tab
   daemon start|stop|status|run|once
   unload <id> [--yes]        unload a currently loaded model
   pause [--yes]              pause llama-swap
@@ -113,9 +114,10 @@ export async function run(argv) {
       case "dashboard":
         return await dashboard({ url: o.url, once: o.once });
       case "open": {
-        const target = o.target ?? "workspace";
-        if (!["workspace", "split", "popup"].includes(target)) { console.error("--target must be workspace|split|popup"); return 2; }
-        const r = await openDashboard({ target });
+        let target = o.target ?? "workspace";
+        if (target === "hc-tab") target = "hc";
+        if (!["workspace", "split", "popup", "hc"].includes(target)) { console.error("--target must be workspace|split|popup|hc|hc-tab"); return 2; }
+        const r = target === "hc" ? await openHcTab({}) : await openDashboard({ target });
         if (!r.ok) { console.error(r.reason); return 1; }
         console.log(o.json ? JSON.stringify(r) : r.id);
         return 0;
