@@ -4,6 +4,7 @@ import { pluginRoot } from "./open.js";
 import { unwrap } from "./lib/herdr.js";
 
 const NAME = "llama-swap";
+const SPACE = "status";
 const DASH_RE = /src\/cli\.js\s+dashboard/;
 
 export function herdrCoreBin(env = process.env) {
@@ -110,12 +111,16 @@ function firstBlock(node) {
   return null;
 }
 
-/** Pure: point (or create) the llama-swap tab in spaces[0] at terminal addr. -> {ok,value,tab} | {ok:false,reason} */
+/** Pure: point (or create) the llama-swap tab inside the dedicated `status` space (created at index 0 if absent). -> {ok,value,tab} | {ok:false,reason} */
 export function applyTab(value, addr, rand = () => randomBytes(16).toString("hex")) {
   const v = structuredClone(value);
-  const space = Array.isArray(v?.spaces) ? v.spaces[0] : null;
-  if (!space || typeof space !== "object") return { ok: false, reason: "herdr-app document has no spaces[0]" };
-  if (!Array.isArray(space.tabs)) return { ok: false, reason: "herdr-app spaces[0] has no tabs array" };
+  if (!Array.isArray(v?.spaces) || v.spaces.length === 0) return { ok: false, reason: "herdr-app document has no spaces[0]" };
+  let space = v.spaces.find((sp) => sp && typeof sp === "object" && sp.name === SPACE);
+  if (!space) {
+    space = { folder: "/home/herdr", id: "sp" + rand(), name: SPACE, tabs: [] };
+    v.spaces.unshift(space);
+  }
+  if (!Array.isArray(space.tabs)) return { ok: false, reason: `herdr-app space "${SPACE}" has no tabs array` };
   const existing = space.tabs.find((t) => t && t.name === NAME);
   if (existing) {
     const b = firstBlock(existing.root);

@@ -21,9 +21,15 @@ const mkDoc = () => ({
     { folder: "x", id: "sp2", name: "second", tabs: [{ id: "tbccc", name: "llama-swap", root: { type: "row", id: "tbccc", children: [{ type: "block", id: "pbccc", content: { terminal: "t99" } }] } }] },
   ],
 });
+const statusSpace = (term) => ({
+  folder: "/home/herdr",
+  id: "spa70b82e879ddea15c68a4adf52e56d04",
+  name: "status",
+  tabs: term === undefined ? [] : [{ id: "tbec03", name: "llama-swap", root: { type: "row", id: "tbec03", children: [{ type: "block", id: "pbec03", content: { terminal: term } }] } }],
+});
 const withTab = (term) => {
   const d = mkDoc();
-  d.spaces[0].tabs.splice(1, 0, { id: "tbec03", name: "llama-swap", root: { type: "row", id: "tbec03", children: [{ type: "block", id: "pbec03", content: { terminal: term } }] } });
+  d.spaces.unshift(statusSpace(term));
   return d;
 };
 const DASH_GET = '{"address":"t2v","argv":["node","src/cli.js","dashboard"],"state":"live","name":"llama-swap","foreground":{"argv":["/usr/bin/node","/x/herdr-llama-swap/src/cli.js","dashboard"],"name":"MainThread","pid":1}}';
@@ -63,6 +69,7 @@ function fake(doc = mkDoc()) {
     '        touch "$D/conflicted"; echo $((ver+1)) > "$D/ver"\n' +
     '        echo "{\\"id\\":$id,\\"jsonrpc\\":\\"2.0\\",\\"error\\":{\\"code\\":-32010,\\"message\\":\\"version conflict\\"}}"\n' +
     "      else\n" +
+    '        echo "$line" | sed \'s/^.*"value":\\(.*\\),"version":[0-9]*}}$/\\1/\' > "$D/doc.json"; echo $((ver+1)) > "$D/ver"\n' +
     '        echo "{\\"id\\":$id,\\"jsonrpc\\":\\"2.0\\",\\"result\\":{\\"version\\":$((ver+1))}}"\n' +
     "      fi\n" +
     "    fi;;\n" +
@@ -70,6 +77,7 @@ function fake(doc = mkDoc()) {
     "exit 0\n";
   fs.writeFileSync(bin, script, { mode: 0o755 });
   const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").trim().split("\n").filter(Boolean) : []);
+  const dir_ = dir;
   const open = (args, extra = {}) => {
     const r = spawnSync("node", [CLI, "open", ...args], {
       encoding: "utf8",
@@ -78,7 +86,7 @@ function fake(doc = mkDoc()) {
     const rpcs = lines(rpcLog).map((l) => JSON.parse(l));
     return { ...r, calls: lines(log), rpcs, sets: rpcs.filter((x) => x.method === "doc.set"), gets: rpcs.filter((x) => x.method === "doc.get") };
   };
-  return { open };
+  return { open, dir: dir_ };
 }
 
 const runs = (c) => c.filter((x) => x.startsWith("run "));
@@ -102,8 +110,11 @@ test("hc fresh: runs terminal, one doc.set, tab inserted at index 0 with row id 
   assert.match(tab.root.children[0].id, /^pb[0-9a-f]{32}$/);
   assert.equal(tab.root.children[0].type, "block");
   assert.deepEqual(tab.root.children[0].content, { terminal: "t9z" });
-  assert.deepEqual(v.spaces[0].tabs.slice(1), mkDoc().spaces[0].tabs);
-  assert.deepEqual(v.spaces[1], mkDoc().spaces[1]);
+  assert.equal(v.spaces.length, 3);
+  assert.equal(v.spaces[0].name, "status");
+  assert.match(v.spaces[0].id, /^sp[0-9a-f]{32}$/);
+  assert.equal(v.spaces[0].tabs.length, 1);
+  assert.deepEqual(v.spaces.slice(1), mkDoc().spaces);
 });
 
 test("hc existing live terminal + existing tab: no run, one doc.set changing only content.terminal", () => {
@@ -118,8 +129,8 @@ test("hc existing live terminal + existing tab: no run, one doc.set changing onl
   assert.deepEqual(r.sets[0].params.value, expected);
   const orig = withTab("tOLD");
   assert.notDeepEqual(r.sets[0].params.value, orig);
-  assert.equal(r.sets[0].params.value.spaces[0].tabs[1].id, "tbec03");
-  assert.deepEqual(r.sets[0].params.value.spaces[1], orig.spaces[1]);
+  assert.equal(r.sets[0].params.value.spaces[0].tabs[0].id, "tbec03");
+  assert.deepEqual(r.sets[0].params.value.spaces.slice(1), orig.spaces.slice(1));
 });
 
 test("hc dead terminal with the right name: rm before run", () => {
@@ -188,7 +199,7 @@ test("hc: herdr-core failing (FAIL=1) -> exit 1, one stderr line", () => {
   assert.equal(r.stderr.trim().split("\n").length, 1);
 });
 
-test("hc: missing spaces[0] -> failure, no doc.set", () => {
+test("hc: empty/missing spaces -> failure, no doc.set", () => {
   const r = fake({ spaces: [] }).open(["--target", "hc"], { LS: lsOf([LIVE]), GET: DASH_GET });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /spaces\[0\]/);
@@ -209,4 +220,54 @@ test("hc: bare stdout is the address only; herdr (not herdr-core) is never neede
   const r = fake().open(["--target=hc"], { LS: lsOf([LIVE]), GET: DASH_GET, HERDR_BIN_PATH: "/nonexistent/herdr" });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, "t2v\n");
+});
+
+test("hc: status space present, no llama-swap tab -> tab added inside it, nothing else changes", () => {
+  const doc = mkDoc();
+  doc.spaces.unshift(statusSpace());
+  doc.spaces[0].tabs.push({ id: "tbzzz", name: "other-status", root: { type: "row", id: "tbzzz", children: [] } });
+  const r = fake(doc).open(["--target", "hc"], { LS: lsOf([LIVE]), GET: DASH_GET });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.sets.length, 1);
+  const v = r.sets[0].params.value;
+  assert.equal(v.spaces.filter((s) => s.name === "status").length, 1);
+  assert.deepEqual(v.spaces.map((s) => s.id), doc.spaces.map((s) => s.id));
+  assert.equal(v.spaces[0].tabs[0].name, "llama-swap");
+  assert.match(v.spaces[0].tabs[0].id, /^tb[0-9a-f]{32}$/);
+  assert.deepEqual(v.spaces[0].tabs.slice(1), doc.spaces[0].tabs);
+  assert.deepEqual(v.spaces.slice(1), doc.spaces.slice(1));
+});
+
+test("hc: default space (name \"\") with a stray llama-swap tab is never used; status space created", () => {
+  const doc = mkDoc();
+  doc.spaces[0].tabs.unshift({ id: "tbstray", name: "llama-swap", root: { type: "row", id: "tbstray", children: [{ type: "block", id: "pbstray", content: { terminal: "t1" } }] } });
+  const r = fake(doc).open(["--target", "hc"], { LS: lsOf([LIVE]), GET: DASH_GET });
+  assert.equal(r.status, 0, r.stderr);
+  const v = r.sets[0].params.value;
+  assert.equal(v.spaces[0].name, "status");
+  assert.equal(v.spaces[0].tabs.length, 1);
+  assert.equal(v.spaces[0].tabs[0].root.children[0].content.terminal, "t2v");
+  assert.deepEqual(v.spaces.slice(1), doc.spaces);
+});
+
+test("hc: status space with non-array tabs -> failure, no doc.set", () => {
+  const doc = mkDoc();
+  doc.spaces.unshift({ ...statusSpace(), tabs: "nope" });
+  const r = fake(doc).open(["--target", "hc"], { LS: lsOf([LIVE]), GET: DASH_GET });
+  assert.equal(r.status, 1);
+  assert.equal(r.sets.length, 0);
+});
+
+test("hc: idempotent across two runs (doc.set persisted by the fake)", () => {
+  const f = fake();
+  const r1 = f.open(["--target", "hc"], { LS: lsOf([OTHER]) });
+  assert.equal(r1.status, 0, r1.stderr);
+  const r2 = f.open(["--target", "hc"], { LS: lsOf([LIVE]), GET: DASH_GET });
+  assert.equal(r2.status, 0, r2.stderr);
+  const doc = JSON.parse(fs.readFileSync(path.join(f.dir, "doc.json"), "utf8"));
+  assert.equal(doc.spaces.filter((s) => s.name === "status").length, 1);
+  assert.equal(doc.spaces.length, 3);
+  assert.equal(doc.spaces[0].tabs.length, 1);
+  assert.equal(doc.spaces[0].tabs[0].root.children[0].content.terminal, "t2v");
+  assert.deepEqual(doc.spaces.slice(1), mkDoc().spaces);
 });
