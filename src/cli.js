@@ -20,7 +20,10 @@ Commands:
   once                       alias of status
   models                     list models and load state
   dashboard [--once]         live TUI (snapshot with --once or when not a TTY)
-  open [--target T]          open live dashboard: workspace (default), split, popup in herdr; hc|hc-tab = herdr-core app tab
+  open [--target T]          open live dashboard. Default: hc (herdr-core tab in the "status" space,
+                             visible in the Herdr desktop app). Others: --target workspace | --target split
+                             | --target popup (herdr-server panes; desktop app does not show them); hc-tab = hc.
+                             Env LLAMASWAP_OPEN_TARGET sets the default when no --target is given.
   daemon start|stop|status|run|once
   unload <id> [--yes]        unload a currently loaded model
   pause [--yes]              pause llama-swap
@@ -114,9 +117,11 @@ export async function run(argv) {
       case "dashboard":
         return await dashboard({ url: o.url, once: o.once });
       case "open": {
-        let target = o.target ?? "workspace";
+        const TARGETS = ["workspace", "split", "popup", "hc"];
+        const envT = process.env.LLAMASWAP_OPEN_TARGET === "hc-tab" ? "hc" : process.env.LLAMASWAP_OPEN_TARGET;
+        let target = o.target ?? (TARGETS.includes(envT) ? envT : "hc");
         if (target === "hc-tab") target = "hc";
-        if (!["workspace", "split", "popup", "hc"].includes(target)) { console.error("--target must be workspace|split|popup|hc|hc-tab"); return 2; }
+        if (!TARGETS.includes(target)) { console.error("--target must be workspace|split|popup|hc|hc-tab"); return 2; }
         const r = target === "hc" ? await openHcTab({}) : await openDashboard({ target });
         if (!r.ok) { console.error(r.reason); return 1; }
         console.log(o.json ? JSON.stringify(r) : r.id);

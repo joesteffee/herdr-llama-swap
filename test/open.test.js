@@ -56,7 +56,7 @@ const runCalls = (calls) => calls.filter((c) => c.startsWith("pane run "));
 const EX_LIST = (extra) => JSON.stringify({ result: { workspaces: [{ workspace_id: "w7", label: "llama-swap", ...extra }] } });
 
 test("workspace: creates when none exists", () => {
-  const r = fake().open([]);
+  const r = fake().open(["--target", "workspace"]);
   assert.equal(r.status, 0);
   assert.equal(r.stdout.trim(), "w5");
   assert.match(r.calls[1], /^workspace create --cwd \/plug --label llama-swap --no-focus$/);
@@ -72,7 +72,7 @@ test("workspace: reuses existing labelled workspace, no duplicate", () => {
 });
 
 test("workspace reuse: live tokens + dead dashboard -> exactly one pane run", () => {
-  const r = fake().open([], { LIST: EX_LIST({ root_pane: { pane_id: "w7:p1" }, tokens: { model: "x", tps: "8.4" } }), PROC: SHELL_PROC });
+  const r = fake().open(["--target", "workspace"], { LIST: EX_LIST({ root_pane: { pane_id: "w7:p1" }, tokens: { model: "x", tps: "8.4" } }), PROC: SHELL_PROC });
   assert.equal(r.status, 0);
   assert.equal(r.stdout.trim(), "w7");
   assert.ok(r.calls.includes("pane process-info --pane w7:p1"));
@@ -81,7 +81,7 @@ test("workspace reuse: live tokens + dead dashboard -> exactly one pane run", ()
 });
 
 test("workspace reuse: dashboard already running -> zero pane run (idempotent)", () => {
-  const r = fake().open([], { LIST: EX_LIST({ root_pane: { pane_id: "w7:p1" }, tokens: { model: "x" } }), PROC: DASH_PROC });
+  const r = fake().open(["--target", "workspace"], { LIST: EX_LIST({ root_pane: { pane_id: "w7:p1" }, tokens: { model: "x" } }), PROC: DASH_PROC });
   assert.equal(r.status, 0);
   assert.equal(r.stdout.trim(), "w7");
   assert.ok(r.calls.includes("pane process-info --pane w7:p1"));
@@ -91,7 +91,7 @@ test("workspace reuse: dashboard already running -> zero pane run (idempotent)",
 
 test("workspace reuse: no root pane in workspace list -> resolved from pane list", () => {
   const panes = '{"result":{"panes":[{"pane_id":"w7:p2","workspace_id":"w7"},{"pane_id":"w7:p1","workspace_id":"w7"},{"pane_id":"w1:p1","workspace_id":"w1","focused":true}]}}';
-  const r = fake().open([], { LIST: EX_LIST({ tokens: { model: "x" } }), PANES: panes, PROC: SHELL_PROC });
+  const r = fake().open(["--target", "workspace"], { LIST: EX_LIST({ tokens: { model: "x" } }), PANES: panes, PROC: SHELL_PROC });
   assert.equal(r.status, 0);
   assert.ok(r.calls.includes("pane list"));
   assert.equal(runCalls(r.calls).length, 1);
@@ -99,7 +99,7 @@ test("workspace reuse: no root pane in workspace list -> resolved from pane list
 });
 
 test("workspace reuse: no root pane and pane list cannot resolve -> exit 1", () => {
-  const r = fake().open([], { LIST: EX_LIST({}), PANES: '{"result":{"panes":[]}}' });
+  const r = fake().open(["--target", "workspace"], { LIST: EX_LIST({}), PANES: '{"result":{"panes":[]}}' });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /no root pane/);
   assert.equal(runCalls(r.calls).length, 0);
@@ -150,13 +150,13 @@ test("popup mode delegates to plugin pane open", () => {
 });
 
 test("herdr failing -> exit 1 with reason", () => {
-  const r = fake().open([], { FAIL: "1" });
+  const r = fake().open(["--target", "workspace"], { FAIL: "1" });
   assert.equal(r.status, 1);
   assert.match(r.stderr, /boom/);
 });
 
 test("herdr missing -> exit 1, no throw", () => {
-  const r = fake().open([], { HERDR_BIN_PATH: "/nonexistent/herdr" });
+  const r = fake().open(["--target", "workspace"], { HERDR_BIN_PATH: "/nonexistent/herdr" });
   assert.equal(r.status, 1);
   assert.ok(r.stderr.trim().length > 0);
 });
@@ -164,3 +164,50 @@ test("herdr missing -> exit 1, no throw", () => {
 test("bad target -> exit 2", () => {
   assert.equal(fake().open(["--target", "nope"]).status, 2);
 });
+
+// --- default target / LLAMASWAP_OPEN_TARGET: herdr (HERDR_BIN_PATH) and herdr-core (HERDR_CORE_BIN) both faked, each logging calls
+function both() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fakeboth-"));
+  const mk = (name) => {
+    const bin = path.join(dir, name), log = path.join(dir, name + ".log");
+    fs.writeFileSync(bin, '#!/bin/sh\necho "$@" >> "' + log + '"\nexit 1\n', { mode: 0o755 });
+    return { bin, log };
+  };
+  const h = mk("herdr"), c = mk("herdr-core");
+  const seen = (l) => fs.existsSync(l) && fs.readFileSync(l, "utf8").trim().length > 0;
+  return (args, extra = {}) => {
+    const env = { ...process.env, HERDR_BIN_PATH: h.bin, HERDR_CORE_BIN: c.bin, HERDR_PLUGIN_ROOT: "/plug", HERDR_PANE_ID: "", HERDR_PLUGIN_CONTEXT_JSON: "", HERDR_WORKSPACE_ID: "", ...extra };
+    if (extra.LLAMASWAP_OPEN_TARGET === undefined) delete env.LLAMASWAP_OPEN_TARGET;
+    const r = spawnSync("node", [CLI, "open", ...args], { encoding: "utf8", env });
+    return { ...r, herdr: seen(h.log), core: seen(c.log) };
+  };
+}
+
+test("open: no --target defaults to hc (herdr-core used, herdr not)", () => {
+  const r = both()([]);
+  assert.equal(r.core, true);
+  assert.equal(r.herdr, false);
+});
+
+test("open: LLAMASWAP_OPEN_TARGET=workspace honoured (herdr used, herdr-core not)", () => {
+  const r = both()([], { LLAMASWAP_OPEN_TARGET: "workspace" });
+  assert.equal(r.herdr, true);
+  assert.equal(r.core, false);
+});
+
+test("open: unknown LLAMASWAP_OPEN_TARGET falls back to hc without crashing", () => {
+  const r = both()([], { LLAMASWAP_OPEN_TARGET: "bogus" });
+  assert.equal(r.core, true);
+  assert.equal(r.herdr, false);
+  assert.equal(r.status, 1); // fake core fails; not a usage error (2) or crash
+  assert.doesNotMatch(r.stderr, /at .*\.js:\d+/);
+});
+
+test("open: explicit --target beats LLAMASWAP_OPEN_TARGET; bad explicit target still exits 2", () => {
+  const run = both();
+  const r = run(["--target", "hc"], { LLAMASWAP_OPEN_TARGET: "workspace" });
+  assert.equal(r.core, true);
+  assert.equal(r.herdr, false);
+  assert.equal(run(["--target", "nope"], { LLAMASWAP_OPEN_TARGET: "workspace" }).status, 2);
+});
+

@@ -10,14 +10,14 @@ command = ["node", "src/cli.js", "daemon", "start"]
 
 [[actions]]
 id = "open-dashboard"
-title = "llama-swap Dashboard"
-description = "Show live model, tokens/sec, VRAM, GPU and load/unload controls"
+title = "llama-swap: show status tab"
+description = "Show the live llama-swap dashboard as a tab in the desktop app's status space (herdr-core app tab)"
 contexts = ["global"]
-command = ["./bin/herdr-llama-swap"]
+command = ["./bin/herdr-llama-swap", "--target", "hc"]
 
 [[actions]]
 id = "open-terminal"
-title = "llama-swap: open live status pane"
+title = "llama-swap: open plain herdr pane (workspace)"
 description = "Open the live dashboard in a normal persistent Herdr workspace"
 contexts = ["global"]
 command = ["./bin/herdr-llama-swap", "--target", "workspace"]
