@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -eu
+herdr="${HERDR_BIN_PATH:-herdr}"
+cd "${HERDR_PLUGIN_ROOT:-$(dirname "$0")/..}"
+exec "$herdr" plugin pane open --plugin llama-swap --entrypoint dashboard --placement popup --focus
