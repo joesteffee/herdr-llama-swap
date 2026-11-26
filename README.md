@@ -136,8 +136,8 @@ MIT, © Joe Steffee
 
 `herdr-llama-swap open [--target workspace|split|popup]` (also `bin/herdr-llama-swap --target ...`; bare `bin/herdr-llama-swap` still opens the popup):
 
-- `workspace` (default): reuses the workspace labelled `llama-swap` (focuses it) or creates one with cwd = plugin root, then runs the dashboard in its root pane. This is a **normal, persistent, tiled pane** that can sit beside your agents.
-- `split`: splits the current pane to the right and runs the dashboard there.
+- `workspace` (default): reuses the workspace labelled `llama-swap` (focuses it) or creates one with cwd = plugin root. The root pane comes from `workspace list` (`root_pane.pane_id`), falling back to the first pane of that workspace in `pane list` (matched by `workspace_id`), since `workspace get` does not expose it. The dashboard is (re)started only when it is not already the pane's foreground process, decided with `herdr pane process-info --pane <id>` (a `src/cli.js dashboard` cmdline). So pressing `q` and running `open` again brings it back, while running `open` twice in a row creates nothing new. This is a **normal, persistent, tiled pane** that can sit beside your agents.
+- `split`: resolves the target pane from `$HERDR_PANE_ID`, else `$HERDR_PLUGIN_CONTEXT_JSON`, else the `focused: true` entry of `pane list` (then a `$HERDR_WORKSPACE_ID` match), and calls `herdr pane split --pane <id> --direction right`, then runs the dashboard in the new pane. `--current` is never used: it requires `HERDR_PANE_ID`, which a plain shell does not have.
 - `popup`: the session-modal popup (`plugin pane open --entrypoint dashboard`); it closes with `q`.
 
 It prints the workspace/pane id (or JSON with `--json`); on failure one line goes to stderr and the exit code is 1.
